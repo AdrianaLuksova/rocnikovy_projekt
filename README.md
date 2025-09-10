@@ -20,4 +20,4 @@ konektorek: https://www.aliexpress.com/item/1005005008992353.html?spm=a2g0o.prod
 buzzer: https://www.aliexpress.com/item/1005008991824741.html?spm=a2g0o.productlist.main.12.717964fc25xHZ0&algo_pvid=cba7a39d-5b8a-4294-ae1c-a3ff1dd65ba5&algo_exp_id=cba7a39d-5b8a-4294-ae1c-a3ff1dd65ba5-11&pdp_ext_f=%7B%22order%22%3A%22-1%22%2C%22eval%22%3A%221%22%7D&pdp_npi=6%40dis%21CZK%21241.11%21241.11%21%21%2179.87%2179.87%21%40211b655217569012979678845e681a%2112000047493534826%21sea%21CZ%210%21ABX%211%210%21n_tag%3A-29910%3Bd%3A788da0ab%3Bm03_new_user%3A-29895&curPageLogUid=KN5y3XbY34B2&utparam-url=scene%3Asearch%7Cquery_from%3A%7Cx_object_id%3A1005008991824741%7C_p_origin_prod%3A
 zbytek se domysli
 
--vybany jazyk jeste presne nemam, ale rada bych zkusila neco noveho,napriklad rust.
+-asi python

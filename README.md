@@ -16,4 +16,4 @@ mby i hry??
 KOMPONENTY: 
 
 
-20.9 - pokus vytvorit bin mapu daneho zviratka- nakreslit obrazek.jpg a pres LCD image convertor jej exportovat do .c souboru jako pole pixelu. --- pouziji na platformiu TFT_eSPI 
+20.9 - pokus vytvorit bin mapu daneho zviratka- nakreslit obrazek.jpg a pres LCD image convertor jej exportovat do .c souboru jako pole pixelu. --- pouziji na platformiu TFT_eSPI  -- https://sourceforge.net/projects/lcd-image-converter/

@@ -1,38 +1,37 @@
 #include <Arduino.h>
 
-// Piny pro tlačítka
-const int buttonPin1 = 12;  // Tlačítko 1 na pinu 12
-const int buttonPin2 = 13;  // Tlačítko 2 na pinu 13
+const int buttonPin1 = 12; //1
+const int buttonPin2 = 13;  //2
 
-// Proměnné pro kontrolu, jestli bylo tlačítko stisknuto
+// kontorla jestli stisknuti probehlo
 bool button1Pressed = false;
 bool button2Pressed = false;
 
 void setup() {
-  // Nastavíme piny pro tlačítka jako vstupy
-  pinMode(buttonPin1, INPUT_PULLUP);  // Tlačítko 1 s pull-up rezistorem
-  pinMode(buttonPin2, INPUT_PULLUP);  // Tlačítko 2 s pull-up rezistorem
+  
+  pinMode(buttonPin1, INPUT_PULLUP);  
+  pinMode(buttonPin2, INPUT_PULLUP);  
 
-  // Spustíme sériovou komunikaci pro výstup
+  
   Serial.begin(115200);
 }
 
 void loop() {
-  // Zkontrolujeme, jestli bylo tlačítko 1 stisknuto
-  if (digitalRead(buttonPin1) == LOW) {  // Pokud je na pinu 12 nízký signál (tlačítko stisknuté)
+  // Zkontroluju, jestli bylo tlačítko 1 stisknuto
+  if (digitalRead(buttonPin1) == LOW) {  // jestli je na pinu 12 nízký signál (tlačítko stisknuté)
     if (!button1Pressed) {  // Pokud tlačítko ještě nebylo zaznamenáno
       Serial.println("Tlačítko 1 bylo stisknuto!");
-      button1Pressed = true;  // Zapamatujeme si, že tlačítko bylo stisknuto
+      button1Pressed = true;  // Zapamatujeme si ze jo
     }
   } else {
-    button1Pressed = false;  // Pokud tlačítko není stisknuté, resetuj stav
+    button1Pressed = false;  // Pokud ne - resetuj stav
   }
 
-  // Zkontrolujeme, jestli bylo tlačítko 2 stisknuto
+  // Zkontroluju jestli tlačítko 2 stisknuto
   if (digitalRead(buttonPin2) == LOW) {  // Pokud je na pinu 13 nízký signál (tlačítko stisknuté)
-    if (!button2Pressed) {  // Pokud tlačítko ještě nebylo zaznamenáno
+    if (!button2Pressed) {  // Pokud tlačítko ještě nebylo 
       Serial.println("Tlačítko 2 bylo stisknuto!");
-      button2Pressed = true;  // Zapamatujeme si, že tlačítko bylo stisknuto
+      button2Pressed = true;  // Zapamatujeme si že stisknuto
     }
   } else {
     button2Pressed = false;  // Pokud tlačítko není stisknuté, resetuj stav

@@ -20,3 +20,5 @@ KOMPONENTY:
 
 
 20.9 - pokus vytvorit bin mapu daneho zviratka- nakreslit obrazek.jpg a pres LCD image convertor jej exportovat do .c souboru jako pole pixelu. --- pouziji na platformiu TFT_eSPI  -- https://sourceforge.net/projects/lcd-image-converter/
+
+https://forum.arduino.cc/t/interrupts-internal-pull-resistors/178384

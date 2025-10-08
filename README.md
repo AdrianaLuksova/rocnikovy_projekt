@@ -22,3 +22,7 @@ KOMPONENTY:
 20.9 - pokus vytvorit bin mapu daneho zviratka- nakreslit obrazek.jpg a pres LCD image convertor jej exportovat do .c souboru jako pole pixelu. --- pouziji na platformiu TFT_eSPI  -- https://sourceforge.net/projects/lcd-image-converter/
 01 - prerusovani = presusovaci system tlacitek pomoci funkce attachInterrupt ✅
 02 - stav = ukladani stavu zakladnich potreb mazlicka(spanek a jidlo), pomoci knihovny prferences, ta pouziva EEPROM. Tato paměť zůstane zachovaná i po vypnutí napájení nebo restartu.Stav zviratka postupne ubyva, stisknutim tlacitka se prida.
+
+
+
+~/.platformio\packages\tool-esptoolpy

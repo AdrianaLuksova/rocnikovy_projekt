@@ -1,7 +1,6 @@
 🐰 BunnyBuddy – Mini Tamagoči
 
-
-Tvůj virtuální mazlíček hned po otevření!
+![BunnyBuddy náhled](kralik/base1.png)
 
 🌈 Rychlá navigace
 

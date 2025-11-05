@@ -1,0 +1,399 @@
+#include <Arduino.h>
+#include <TFT_eSPI.h>
+#include <FS.h>
+#include <LittleFS.h>
+#include <Preferences.h>
+
+// === TFT ===
+TFT_eSPI tft = TFT_eSPI();
+
+// === Piny tlačítek ===
+const int BTN_LEFT = 32;
+const int BTN_OK = 33;
+const int BTN_RIGHT = 25;
+
+// === Přerušení ===
+volatile bool actionInProgress = false;
+volatile int selectedAction = 0;
+volatile bool needsRedraw = false;
+const int ACTION_COUNT = 6;
+
+// === Stav ===
+Preferences prefs;
+int hunger = 100;
+int sleepiness = 100;
+int hygiene = 100;
+int health = 100;
+bool sick = false;
+
+unsigned long lastDecay = 0;
+const unsigned long decayInterval = 10000;
+
+unsigned long lastIllCheck = 0;
+unsigned long nextIllTime = 60000;
+
+// Názvy akcí pro menu
+const char* actionNames[] = {"EAT", "SLEEP", "BATH", "PLAY", "HEAL", "INFO"};
+const char* actionShort[] = {"E", "S", "B", "P", "H", "I"};
+
+// === Prototypy ===
+void drawIdle();
+void drawMenu();
+void playActionNonBlocking(const char *bmp1, const char *bmp2);
+void executeAction(int action);
+void saveState();
+void loadState();
+void checkIllness();
+
+// === Přerušení - OKAMŽITÁ reakce ===
+void IRAM_ATTR onLeft() {
+  static unsigned long lastPress = 0;
+  unsigned long now = millis();
+  if (now - lastPress > 200) {
+    lastPress = now;
+    if (!actionInProgress) {
+      selectedAction = (selectedAction - 1 + ACTION_COUNT) % ACTION_COUNT;
+      needsRedraw = true;
+      Serial.printf("⬅️ LEFT -> Akce: %s\n", actionNames[selectedAction]);
+    }
+  }
+}
+
+void IRAM_ATTR onRight() {
+  static unsigned long lastPress = 0;
+  unsigned long now = millis();
+  if (now - lastPress > 200) {
+    lastPress = now;
+    if (!actionInProgress) {
+      selectedAction = (selectedAction + 1) % ACTION_COUNT;
+      needsRedraw = true;
+      Serial.printf("➡️ RIGHT -> Akce: %s\n", actionNames[selectedAction]);
+    }
+  }
+}
+
+void IRAM_ATTR onOK() {
+  static unsigned long lastPress = 0;
+  unsigned long now = millis();
+  if (now - lastPress > 300) {
+    lastPress = now;
+    if (!actionInProgress) {
+      actionInProgress = true;
+      Serial.printf("✅ OK -> Spouštím: %s\n", actionNames[selectedAction]);
+    }
+  }
+}
+
+// === BMP načítání ===
+bool drawBmp(const char *filename, int16_t x, int16_t y) {
+  File bmpFS = LittleFS.open(filename, "r");
+  if (!bmpFS) {
+    Serial.printf("❌ Chyba: %s\n", filename);
+    return false;
+  }
+
+  if (bmpFS.read() != 'B' || bmpFS.read() != 'M') {
+    bmpFS.close();
+    return false;
+  }
+
+  bmpFS.seek(10);
+  uint32_t seekOffset = bmpFS.read() | (bmpFS.read() << 8) | (bmpFS.read() << 16) | (bmpFS.read() << 24);
+  
+  bmpFS.seek(18);
+  int32_t w = bmpFS.read() | (bmpFS.read() << 8) | (bmpFS.read() << 16) | (bmpFS.read() << 24);
+  int32_t h = bmpFS.read() | (bmpFS.read() << 8) | (bmpFS.read() << 16) | (bmpFS.read() << 24);
+
+  uint32_t rowSize = ((w * 3 + 3) / 4) * 4;
+  bmpFS.seek(seekOffset);
+  
+  uint8_t r, g, b;
+  for (int row = h - 1; row >= 0; row--) {
+    for (int col = 0; col < w; col++) {
+      b = bmpFS.read();
+      g = bmpFS.read();
+      r = bmpFS.read();
+      tft.drawPixel(x + col, y + row, tft.color565(r, g, b));
+    }
+    for (uint32_t pad = w * 3; pad < rowSize; pad++) {
+      bmpFS.read();
+    }
+  }
+  
+  bmpFS.close();
+  return true;
+}
+
+// === Vykreslení menu ===
+void drawMenu() {
+  tft.fillRect(0, 110, 240, 25, TFT_BLACK);
+  
+  int iconWidth = 40;
+  
+  for (int i = 0; i < ACTION_COUNT; i++) {
+    int x = i * iconWidth;
+    
+    // Zvýraznění vybrané akce
+    if (i == selectedAction) {
+      tft.fillRect(x, 110, iconWidth, 25, TFT_BLUE);
+    } else {
+      tft.fillRect(x, 110, iconWidth, 25, TFT_DARKGREY);
+    }
+    
+    tft.drawRect(x, 110, iconWidth, 25, TFT_WHITE);
+    
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_WHITE);
+    tft.setCursor(x + 12, 115);
+    tft.print(actionShort[i]);
+  }
+}
+
+// === Setup ===
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n\n🐾 Tamagotchi Start!");
+  
+  // Podsvícení
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
+  
+  // Display init
+  tft.init();
+  tft.setRotation(1);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.setCursor(40, 60);
+  tft.println("Loading...");
+
+  // LittleFS
+  if (!LittleFS.begin()) {
+    Serial.println("❌ LittleFS FAIL");
+    tft.fillScreen(TFT_RED);
+    tft.setCursor(40, 60);
+    tft.println("ERROR!");
+    while (1);
+  }
+  Serial.println("✅ LittleFS OK");
+
+  // Tlačítka s interrupty
+  pinMode(BTN_LEFT, INPUT_PULLUP);
+  pinMode(BTN_RIGHT, INPUT_PULLUP);
+  pinMode(BTN_OK, INPUT_PULLUP);
+  
+  delay(50);
+  
+  attachInterrupt(digitalPinToInterrupt(BTN_LEFT), onLeft, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BTN_RIGHT), onRight, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BTN_OK), onOK, FALLING);
+  
+  Serial.println("✅ Tlačítka připravena");
+  Serial.printf("   Status: LEFT=%d, OK=%d, RIGHT=%d\n", 
+                digitalRead(BTN_LEFT), 
+                digitalRead(BTN_OK), 
+                digitalRead(BTN_RIGHT));
+
+  // Load state
+  prefs.begin("pet", false);
+  loadState();
+  prefs.end();
+
+  randomSeed(analogRead(0));
+
+  // První zobrazení
+  drawIdle();
+  drawMenu();
+  
+  Serial.println("✅ Ready! Stiskni tlačítka...");
+}
+
+// === Main loop ===
+void loop() {
+  // Decay každých 10s
+  if (millis() - lastDecay > decayInterval) {
+    lastDecay = millis();
+    hunger = max(0, hunger - 1);
+    sleepiness = max(0, sleepiness - 1);
+    hygiene = max(0, hygiene - 1);
+    health = max(0, health - (sick ? 2 : 0));
+    saveState();
+    Serial.printf("📉 Decay: H=%d S=%d Hy=%d He=%d\n", hunger, sleepiness, hygiene, health);
+  }
+
+  // Kontrola nemoci
+  checkIllness();
+
+  // Překreslit menu pokud bylo změněno z interruptu
+  if (needsRedraw) {
+    needsRedraw = false;
+    drawMenu();
+  }
+
+  // Provést akci pokud bylo stisknuto OK
+  if (actionInProgress) {
+    executeAction(selectedAction);
+    actionInProgress = false;
+    needsRedraw = true;
+  }
+
+  delay(10);
+}
+
+// === Provedení akce ===
+void executeAction(int action) {
+  Serial.printf("🎬 Executing action %d: %s\n", action, actionNames[action]);
+  
+  switch (action) {
+    case 0: // JÍDLO
+      playActionNonBlocking("/eat1.bmp", "/eat2.bmp"); 
+      hunger = min(100, hunger + 20);
+      Serial.printf("🍖 Hlad: %d -> %d\n", hunger-20, hunger);
+      break;
+      
+    case 1: // SPÁNEK
+      playActionNonBlocking("/sleep1.bmp", "/sleep2.bmp"); 
+      sleepiness = min(100, sleepiness + 20);
+      Serial.printf("😴 Spánek: %d -> %d\n", sleepiness-20, sleepiness);
+      break;
+      
+    case 2: // KOUPEL
+      playActionNonBlocking("/bath1.bmp", "/bath2.bmp"); 
+      hygiene = min(100, hygiene + 20);
+      Serial.printf("🧼 Hygiena: %d -> %d\n", hygiene-20, hygiene);
+      break;
+      
+    case 3: // HRA
+      playActionNonBlocking("/play1.bmp", "/play2.bmp"); 
+      health = min(100, health + 10);
+      hunger = max(0, hunger - 5);
+      Serial.printf("🎮 Zdraví: +10, Hlad: -5\n");
+      break;
+      
+    case 4: // LÉČBA
+      if (sick) {
+        playActionNonBlocking("/heal1.bmp", "/heal2.bmp");
+        sick = false;
+        health = min(100, health + 30);
+        Serial.println("💊 VYLÉČENO!");
+      } else {
+        playActionNonBlocking("/heal1.bmp", "/heal2.bmp");
+        Serial.println("💊 Není nemocný");
+      }
+      break;
+      
+    case 5: // STAV
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(2);
+      tft.setTextColor(TFT_CYAN, TFT_BLACK);
+      tft.setCursor(10, 10);
+      tft.println("=== STAV ===");
+      
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.setCursor(10, 40);
+      tft.printf("Hlad:    %d%%\n", hunger);
+      tft.printf("Spanek:  %d%%\n", sleepiness);
+      tft.printf("Hygiena: %d%%\n", hygiene);
+      tft.printf("Zdravi:  %d%%\n", health);
+      
+      if (sick) {
+        tft.setTextColor(TFT_RED, TFT_BLACK);
+        tft.setCursor(10, 100);
+        tft.println("NEMOCNY!");
+      }
+      
+      // Čekání s možností přerušení
+      unsigned long startWait = millis();
+      while (millis() - startWait < 3000) {
+        if (needsRedraw) break; // Tlačítko bylo stisknuto
+        delay(10);
+      }
+      break;
+  }
+
+  saveState();
+  drawIdle();
+}
+
+// === Animace bez blokování ===
+void playActionNonBlocking(const char *bmp1, const char *bmp2) {
+  for (int i = 0; i < 3; i++) {
+    tft.fillRect(0, 0, 240, 110, TFT_BLACK);
+    drawBmp(bmp1, 0, 0);
+    
+    // Čekání s možností přerušení
+    for (int j = 0; j < 30; j++) {
+      if (needsRedraw) return; // Přerušení animace
+      delay(10);
+    }
+    
+    tft.fillRect(0, 0, 240, 110, TFT_BLACK);
+    drawBmp(bmp2, 0, 0);
+    
+    for (int j = 0; j < 30; j++) {
+      if (needsRedraw) return; // Přerušení animace
+      delay(10);
+    }
+  }
+}
+
+// === Funkce ===
+void drawIdle() {
+  tft.fillRect(0, 0, 240, 110, TFT_BLACK);
+  
+  if (sick) {
+    if (!drawBmp("/sick1.bmp", 0, 0)) {
+      tft.setCursor(90, 45);
+      tft.setTextColor(TFT_RED, TFT_BLACK);
+      tft.setTextSize(4);
+      tft.println(":(");
+    }
+  } else {
+    if (!drawBmp("/base1.bmp", 0, 0)) {
+      tft.setCursor(90, 45);
+      tft.setTextColor(TFT_GREEN, TFT_BLACK);
+      tft.setTextSize(4);
+      tft.println(":)");
+    }
+  }
+}
+
+void saveState() {
+  prefs.begin("pet", false);
+  prefs.putInt("hunger", hunger);
+  prefs.putInt("sleepiness", sleepiness);
+  prefs.putInt("hygiene", hygiene);
+  prefs.putInt("health", health);
+  prefs.putBool("sick", sick);
+  prefs.end();
+}
+
+void loadState() {
+  hunger = prefs.getInt("hunger", 100);
+  sleepiness = prefs.getInt("sleepiness", 100);
+  hygiene = prefs.getInt("hygiene", 100);
+  health = prefs.getInt("health", 100);
+  sick = prefs.getBool("sick", false);
+  Serial.printf("📂 Loaded: H=%d S=%d Hy=%d He=%d Sick=%d\n", 
+                hunger, sleepiness, hygiene, health, sick);
+}
+
+void checkIllness() {
+  if (!sick && millis() - lastIllCheck > nextIllTime) {
+    lastIllCheck = millis();
+    
+    int illChance = 7;
+    if (hunger < 30) illChance -= 1;
+    if (sleepiness < 30) illChance -= 1;
+    if (hygiene < 30) illChance -= 2;
+    
+    if (random(0, 10) > illChance) {
+      sick = true;
+      playActionNonBlocking("/sick1.bmp", "/sick2.bmp");
+      saveState();
+      Serial.println("🤒 ONEMOCNĚL!");
+    }
+    nextIllTime = random(60000, 180000);
+  }
+}

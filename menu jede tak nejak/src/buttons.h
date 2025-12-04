@@ -4,9 +4,9 @@
 #include <Arduino.h>
 
 // === KLÍČOVÉ KONSTANTY PRO CELÝ PROJEKT (Definované zde) ===
-const int PIN_LEFT = 25;
-const int PIN_CENTER = 32;
-const int PIN_RIGHT = 33;
+const int PIN_LEFT = 32;
+const int PIN_CENTER = 33;
+const int PIN_RIGHT = 25;
 const int ACTION_COUNT = 6;
 const int DEBOUNCE_DELAY_MS = 200; 
 
@@ -22,5 +22,6 @@ void IRAM_ATTR handleRightPress();
 
 // === Inicializace tlačítek - IMPLEMENTOVANÉ V buttons.cpp ===
 void initButtons();
+
 
 #endif

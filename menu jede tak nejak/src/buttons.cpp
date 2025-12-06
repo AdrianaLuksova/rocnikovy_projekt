@@ -1,10 +1,11 @@
 #include "buttons.h"
 #include <Arduino.h>
 
-// Debounce
+volatile unsigned long lastPress = 0; 
+const unsigned long DEBOUNCE_DELAY = 200;
+
 void IRAM_ATTR handleLeftPress() {
-    static unsigned long lastPress = 0;
-    if (millis() - lastPress < 200) return;
+    if (millis() - lastPress < DEBOUNCE_DELAY) return;
     lastPress = millis();
 
     selectedAction = (selectedAction - 1 + ACTION_COUNT) % ACTION_COUNT;
@@ -13,15 +14,12 @@ void IRAM_ATTR handleLeftPress() {
     if(actionInProgress) {
         actionInProgress = false; 
         needsRedraw = true; 
-        actionInProgress = true; // Okamžitý restart akce
+        actionInProgress = true;
     }
-    // Serial print v ISR není ideální, ale pro debug nutný:
-    // Serial.println("LEFT"); 
 }
 
 void IRAM_ATTR handleCenterPress() {
-    static unsigned long lastPress = 0;
-    if (millis() - lastPress < 200) return;
+    if (millis() - lastPress < DEBOUNCE_DELAY) return;
     lastPress = millis();
 
     if(!actionInProgress) actionInProgress = true;
@@ -32,8 +30,7 @@ void IRAM_ATTR handleCenterPress() {
 }
 
 void IRAM_ATTR handleRightPress() {
-    static unsigned long lastPress = 0;
-    if (millis() - lastPress < 200) return;
+    if (millis() - lastPress < DEBOUNCE_DELAY) return;
     lastPress = millis();
 
     selectedAction = (selectedAction + 1) % ACTION_COUNT;
@@ -54,7 +51,4 @@ void initButtons() {
     attachInterrupt(digitalPinToInterrupt(PIN_LEFT), handleLeftPress, FALLING);
     attachInterrupt(digitalPinToInterrupt(PIN_CENTER), handleCenterPress, FALLING);
     attachInterrupt(digitalPinToInterrupt(PIN_RIGHT), handleRightPress, FALLING);
-
-    Serial.println("✅ Tlačítka inicializována (Piny: 25, 32, 33)");
-    Serial.println("ℹ️ Ujisti se, že tlačítka spínají proti GND!");
 }

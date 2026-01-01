@@ -3,10 +3,15 @@
 
 #include <Arduino.h>
 
+// Základní funkce
 void initSound();
-void playTone(int freq, int duration);
-void playStart();  // Cinknutí na začátku
-void playCancel(); // Hluboké pípnutí při zrušení
-void playAlarm();  // Siréna
+void playClick();
+void playSuccess();
+void playAlarm();
+
+// === TYTO FUNKCE TI CHYBĚLY ===
+void playStart();
+void playCancel();
+void playTone(int freq, int duration); 
 
 #endif

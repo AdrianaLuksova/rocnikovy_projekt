@@ -3,22 +3,44 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include <TFT_eSPI.h>
 #include "display.h"
 #include "sound.h" 
 
-extern volatile bool actionInProgress;
+// === PROMĚNNÉ HRY ===
+// Tento soubor includuj JEN V main.cpp!
 
-extern int hunger, sleepiness, hygiene, health, happiness;
-extern bool sick;
-extern unsigned long lastDecay, decayInterval;
-extern unsigned long lastIllCheck, nextIllTime;
-extern Preferences prefs;
+// 1. Proměnné pro logiku akcí (OPRAVENO: přidáno volatile)
+volatile int selectedAction = 0;   // Která ikona je vybraná (0-4)
+volatile bool needsRedraw = true;  // Jestli se má překreslit menu
+volatile bool actionInProgress = false; // Jestli se něco děje
+
+// 2. Statistiky mazlíčka
+int hunger = 100;
+int sleepiness = 100;
+int hygiene = 100;
+int health = 100;
+int happiness = 100;
+bool sick = false;
+
+// 3. Časování
+unsigned long lastDecay = 0;
+unsigned long decayInterval = 60000; 
+unsigned long lastIllCheck = 0;
+unsigned long nextIllTime = 900000;
+
+Preferences prefs;
+
+// Odkaz na displej z main.cpp
+extern TFT_eSPI tft; 
+
+// === POMOCNÉ FUNKCE ===
 
 void saveState() {
     prefs.begin("pet-state", false);
     prefs.putInt("hunger", hunger);
     prefs.putInt("sleep", sleepiness);
-    prefs.putInt("hygiene", hygiene);
+    prefs.putInt("hyg", hygiene); 
     prefs.putInt("health", health);
     prefs.putInt("happy", happiness);
     prefs.putBool("sick", sick);
@@ -29,11 +51,23 @@ void loadState() {
     prefs.begin("pet-state", true);
     hunger = prefs.getInt("hunger", 100);
     sleepiness = prefs.getInt("sleep", 100);
-    hygiene = prefs.getInt("hygiene", 100);
+    hygiene = prefs.getInt("hyg", 100);
     health = prefs.getInt("health", 100);
     happiness = prefs.getInt("happy", 100);
     sick = prefs.getBool("sick", false);
     prefs.end();
+}
+
+bool safeDelay(int ms) {
+    unsigned long start = millis();
+    while (millis() - start < ms) {
+        if (!actionInProgress) {
+            playCancel();
+            return false;
+        }
+        delay(10);
+    }
+    return true;
 }
 
 void updateDecay() {
@@ -56,7 +90,7 @@ void updateDecay() {
 
         if (critical) playAlarm();
 
-        Serial.printf("📉 STATS: H:%d S:%d B:%d Happy:%d Imm:%d\n", hunger, sleepiness, hygiene, happiness, health);
+        Serial.printf("STATS: H:%d S:%d B:%d Happy:%d HP:%d\n", hunger, sleepiness, hygiene, happiness, health);
         saveState();
     }
 }
@@ -75,21 +109,6 @@ void checkIllness() {
     }
 }
 
-bool safeDelay(int ms) {
-    unsigned long start = millis();
-    while (millis() - start < ms) {
-        
-        EasyBuzzer.update(); // <--- PŘIDAT TOTO (aby to pípalo i během čekání)
-
-        if (!actionInProgress) {
-            playCancel();
-            return false;
-        }
-        delay(10);
-    }
-    return true;
-}
-
 bool playActionAnimated(const char* frame1, const char* frame2) {
     if (sick) {
         playCancel(); 
@@ -104,7 +123,7 @@ bool playActionAnimated(const char* frame1, const char* frame2) {
     return true;
 }
 
-// === TADY JE TA HLAVNÍ ZMĚNA VE STATUSU ===
+// === HLAVNÍ FUNKCE AKCÍ ===
 void executeAction(int action) {
     playStart(); 
 
@@ -115,6 +134,7 @@ void executeAction(int action) {
             if(!playActionAnimated("/eat1.bmp", "/eat2.bmp")) return;
             hunger = min(100, hunger + 20); 
             health = min(100, health + 2); 
+            playSuccess();
             break;
 
         case 1: // SPÁNEK
@@ -125,11 +145,13 @@ void executeAction(int action) {
                 if (!safeDelay(500)) return;
             }
             sleepiness = 100;
+            playSuccess();
             break;
 
         case 2: // KOUPEL
             if(!playActionAnimated("/bath1.bmp", "/bath2.bmp")) return;
             hygiene = 100;
+            playSuccess();
             break;
 
         case 3: // HRA
@@ -138,6 +160,7 @@ void executeAction(int action) {
             sleepiness = max(0, sleepiness - 5);
             happiness = min(100, happiness + 30);
             health = min(100, health + 5);
+            playSuccess();
             break;
 
         case 4: // LÉČBA
@@ -155,20 +178,19 @@ void executeAction(int action) {
                 sick = false;  
                 health = 100;  
                 lastIllCheck = millis(); 
+                playSuccess();
+            } else {
+                playCancel(); 
             }
             break;
 
-        case 5: // === STATUS (PŘEDĚLANÝ VZHLED) ===
+        case 5: // === STATUS ===
             {
-                // 1. Růžové pozadí (R=255, G=182, B=193 - LightPink)
                 uint16_t pinkBG = tft.color565(255, 182, 193);
                 tft.fillScreen(pinkBG);
-                
-                // 2. Černý text (lépe čitelný na růžové)
                 tft.setTextColor(TFT_BLACK, pinkBG);
                 tft.setTextSize(2);
 
-                // Výpis statistik
                 tft.setCursor(10, 20); tft.printf("HLAD:   %d%%\n", hunger);
                 tft.setCursor(10, 45); tft.printf("SPANEK: %d%%\n", sleepiness);
                 tft.setCursor(10, 70); tft.printf("HYGIENA:%d%%\n", hygiene);
@@ -176,44 +198,30 @@ void executeAction(int action) {
                 
                 tft.setCursor(10, 120);
                 if(sick) {
-                    tft.setTextColor(TFT_RED, pinkBG); // Červený text pro nemoc
+                    tft.setTextColor(TFT_RED, pinkBG);
                     tft.print("STAV:   NEMOC!");
                 } else {
-                    tft.setTextColor(TFT_DARKGREEN, pinkBG); // Zelený pro OK
+                    tft.setTextColor(TFT_DARKGREEN, pinkBG);
                     tft.print("STAV:   OK");
                 }
 
-                // === 3. BATERIE (Pravý horní roh) ===
-                // Pin 14 měří napětí (dělič 1/2)
+                // BATERIE
                 uint16_t v = analogRead(14);
-                float voltage = ((float)v / 4095.0) * 3.3 * 2.0; // Přepočet na Volty
-                
-                // Přepočet na procenta (3.0V = 0%, 4.2V = 100%)
+                float voltage = ((float)v / 4095.0) * 3.3 * 2.0; 
                 int batPct = map((long)(voltage * 100), 300, 420, 0, 100);
-                if (batPct > 100) batPct = 100;
-                if (batPct < 0) batPct = 0;
+                if (batPct > 100) batPct = 100; if (batPct < 0) batPct = 0;
 
-                // Kreslení baterky
-                int batX = 190;
-                int batY = 5;
-                // Obrys
+                int batX = 190, batY = 5;
                 tft.drawRect(batX, batY, 40, 15, TFT_BLACK);
-                tft.drawRect(batX + 40, batY + 4, 3, 7, TFT_BLACK); // "Čudlík" baterie
-                
-                // Výplň (Zelená > 20%, Červená < 20%)
+                tft.drawRect(batX + 40, batY + 4, 3, 7, TFT_BLACK); 
                 uint16_t batColor = (batPct > 20) ? TFT_GREEN : TFT_RED;
-                // Šířka výplně podle procent (max 38px)
-                int fillW = (batPct * 38) / 100;
-                tft.fillRect(batX + 1, batY + 1, fillW, 13, batColor);
+                tft.fillRect(batX + 1, batY + 1, (batPct * 38) / 100, 13, batColor);
 
-                // Text procent pod baterkou (malým písmem)
                 tft.setTextSize(1);
                 tft.setTextColor(TFT_BLACK, pinkBG);
                 tft.setCursor(batX, batY + 18);
                 tft.printf("%d%%", batPct);
             }
-            
-            // Čekání na statusu s možností přerušení (déle - 6 sekund)
             safeDelay(6000); 
             break;
     }

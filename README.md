@@ -1,6 +1,6 @@
 🐰 BunnyBuddy – Mini Tamagoči
 
-![BunnyBuddy náhled](kralik/base1.png)
+![BunnyBuddy náhled](bunnybuddylogo.png)
 
 🌈 Rychlá navigace
 

@@ -2,39 +2,42 @@
 #include <Arduino.h>
 
 // Globální proměnná pro debounce
+// volatile říká kompilátoru, že se hodnota může změnit kdykoliv
 volatile unsigned long lastPress = 0; 
 const unsigned long DEBOUNCE_DELAY = 250; 
 
-// === LEVÉ TLAČÍTKO: POSUN VLEVO ===
+// leve tlačítko
+// IRAM_ATTR je nutné pro ESP32, aby funkce běžela v rychlé paměti RAM
 void IRAM_ATTR handleLeftPress() {
+    // 1. Kontrola času: Pokud uplynulo málo času od minula, končíme
     if (millis() - lastPress < DEBOUNCE_DELAY) return;
     lastPress = millis();
 
-    // Pokud běží akce, tlačítko ignorujeme
+    // 2. Blokace: Pokud králík zrovna provádí akci, tlačítko ignorujeme
     if (actionInProgress) return; 
 
+    // 3. Matematika menu: Posun indexu doleva.
     selectedAction = (selectedAction - 1 + ACTION_COUNT) % ACTION_COUNT;
+
+    // 4. Nastavíme, že se má překreslit menu
     needsRedraw = true;
 }
 
-// === STŘEDNÍ TLAČÍTKO: SPUŠTĚNÍ AKCE ===
+// strední tlačítko
 void IRAM_ATTR handleCenterPress() {
     if (millis() - lastPress < DEBOUNCE_DELAY) return;
     lastPress = millis();
 
-    // Tady jen řekneme "ANO, CHCI AKCI".
-    // Samotná funkce akce() se spustí až v main loopu.
     if(!actionInProgress) {
         actionInProgress = true; 
     } 
-    // Pokud už akce běží, můžeme ji tímto přerušit (volitelné)
     else {
         actionInProgress = false; 
         needsRedraw = true;
     }
 }
 
-// === PRAVÉ TLAČÍTKO: POSUN VPRAVO ===
+// pravé tlačítko
 void IRAM_ATTR handleRightPress() {
     if (millis() - lastPress < DEBOUNCE_DELAY) return;
     lastPress = millis();
@@ -50,9 +53,10 @@ void initButtons() {
     pinMode(PIN_CENTER, INPUT_PULLUP);
     pinMode(PIN_RIGHT, INPUT_PULLUP);
 
+    // Připojení přerušení k tlačítkům
     attachInterrupt(digitalPinToInterrupt(PIN_LEFT), handleLeftPress, FALLING);
     attachInterrupt(digitalPinToInterrupt(PIN_CENTER), handleCenterPress, FALLING);
     attachInterrupt(digitalPinToInterrupt(PIN_RIGHT), handleRightPress, FALLING);
 
-    Serial.println("✅ Tlačítka inicializována");
+    //Serial.println("✅ Tlačítka inicializována");
 }

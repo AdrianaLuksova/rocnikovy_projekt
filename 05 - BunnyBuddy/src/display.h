@@ -24,7 +24,6 @@ bool drawBmpPartial(const char *filename, int16_t x, int16_t y, int16_t w, int16
 
 void initDisplay();
 
-// Zpět na jednoduchou deklaraci bez parametrů
 void drawMenu(); 
 
 void showLoading();
@@ -32,7 +31,7 @@ void showError(const char* message);
 
 inline void drawBackground() {
     drawBmp("/pozadi.bmp", 0, 0); 
-    Serial.println("✅ Pozadí nakresleno");
+    //Serial.println("✅ Pozadí nakresleno");
 }
 
 inline void drawBunny(const char* bmpFile) {

@@ -7,13 +7,9 @@
 // Inicializace displeje 
 TFT_eSPI tft = TFT_eSPI(); 
 
-// === INCLUDE SOUBORY ===
-// Pořadí je důležité!
 #include "buttons.h" 
 #include "display.h"
 #include "sound.h"
-
-// pet.h obsahuje veškerou logiku a proměnné hry
 #include "pet.h"        
 
 void akce() {
@@ -43,7 +39,7 @@ void setup() {
     }
 
     // 3. Zvuk
-    //initSound();
+    initSound();
     
     // 4. Tlačítka a Načtení hry
     initButtons(); 

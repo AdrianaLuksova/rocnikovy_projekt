@@ -3,13 +3,11 @@
 
 #include <Arduino.h>
 
-// Základní funkce
 void initSound();
 void playClick();
 void playSuccess();
 void playAlarm();
 
-// === TYTO FUNKCE TI CHYBĚLY ===
 void playStart();
 void playCancel();
 void playTone(int freq, int duration); 

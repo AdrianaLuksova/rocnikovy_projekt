@@ -4,21 +4,17 @@
 #include <LittleFS.h>
 #include <Preferences.h>
 
-// Inicializace displeje (používá se v pet.h)
+// Inicializace displeje 
 TFT_eSPI tft = TFT_eSPI(); 
 
-// === INCLUDE SOUBORY ===
-// Pořadí je důležité!
+// INCLUDE SOUBORY
 #include "buttons.h" 
 #include "display.h"
-#include "sound.h"
-
-// pet.h obsahuje veškerou logiku a proměnné hry
+//#include "sound.h"
 #include "pet.h"        
 
 void akce() {
     executeAction(selectedAction);
-    // Zvuk a animace jsou uvnitř executeAction
     saveState();
     
     // Překreslení po akci (pokud není nemocný, dáme normálního)
@@ -44,7 +40,7 @@ void setup() {
     }
 
     // 3. Zvuk
-    initSound();
+    //initSound();
     
     // 4. Tlačítka a Načtení hry
     initButtons(); 

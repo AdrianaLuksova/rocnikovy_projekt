@@ -5,10 +5,13 @@
 #include <Preferences.h>
 #include <TFT_eSPI.h>
 #include "display.h"
-#include "sound.h"
+#include "sound.h" 
 
+// === PROMĚNNÉ HRY ===
+// Tento soubor includuj JEN V main.cpp!
 
-volatile int selectedAction = 0;   // Která ikona je vybraná
+// 1. Proměnné pro logiku akcí (OPRAVENO: přidáno volatile)
+volatile int selectedAction = 0;   // Která ikona je vybraná (0-4)
 volatile bool needsRedraw = true;  // Jestli se má překreslit menu
 volatile bool actionInProgress = false; // Jestli se něco děje
 
@@ -28,7 +31,8 @@ Preferences prefs;
 
 extern TFT_eSPI tft; 
 
-// pomocné funkce pro uložení a načtení stavu
+// === POMOCNÉ FUNKCE ===
+
 void saveState() {
     // otevře složku v paměti s název "pet-state"
     prefs.begin("pet-state", false);
@@ -60,7 +64,7 @@ bool safeDelay(int ms) {
     // pokud uživatel stiskne tlačítko, přerušíme zpoždění
     while (millis() - start < ms) {
         if (!actionInProgress) {
-            playCancel(); // piiip zrušení
+            playCancel();
             return false;
         }
         delay(10);
@@ -89,7 +93,6 @@ void updateDecay() {
             critical = true;
         }
 
-        // pokud je něcco kritické, zahraj alarm
         if (critical) playAlarm();
 
         //Serial.printf("STATS: H:%d S:%d B:%d Happy:%d HP:%d\n", hunger, sleepiness, hygiene, happiness, health);
@@ -106,7 +109,7 @@ void checkIllness() {
         int chance = (100 - health);  // zdraví 80 = 20% šance na nemoc
         if (random(0, 100) < chance) {
             sick = true;
-            playAlarm();
+            //playAlarm();
             drawBunny("/sick1.bmp");
             saveState();
         }
@@ -118,7 +121,7 @@ void checkIllness() {
 bool playActionAnimated(const char* frame1, const char* frame2) {
     // pokud je králík nemocný, akci nelze provést(kromě léčby)
     if (sick) {
-        playCancel(); 
+        //playCancel(); 
         return false; 
     }
     //Cyklus animace 3x
@@ -131,9 +134,9 @@ bool playActionAnimated(const char* frame1, const char* frame2) {
     return true;
 }
 
-// vykonání vybrané akce
+// === HLAVNÍ FUNKCE AKCÍ ===
 void executeAction(int action) {
-    playStart(); 
+    //playStart(); 
 
     if (!actionInProgress) return;
 
@@ -143,7 +146,7 @@ void executeAction(int action) {
             // Funkce min() zajistí, že nepřekročíme 100%
             hunger = min(100, hunger + 20); 
             health = min(100, health + 2); 
-            playSuccess();
+            //playSuccess();
             break;
 
         // Specifická animace pro spánek (více opakování než je králíček vyspaný)
@@ -155,13 +158,13 @@ void executeAction(int action) {
                 if (!safeDelay(500)) return;
             }
             sleepiness = 100;
-            playSuccess();
+            //playSuccess();
             break;
 
         case 2: // KOUPEL
             if(!playActionAnimated("/bath1.bmp", "/bath2.bmp")) return;
             hygiene = 100;
-            playSuccess();
+            //playSuccess();
             break;
         
         // Hraní stojí energii a jídlo, ale přidává štěstí
@@ -171,14 +174,14 @@ void executeAction(int action) {
             sleepiness = max(0, sleepiness - 5);
             happiness = min(100, happiness + 30);
             health = min(100, health + 5);
-            playSuccess();
+            //playSuccess();
             break;
 
         case 4: // LÉČBA
             if (sick) {
-                playTone(1000, 100); if (!safeDelay(100)) return;
-                playTone(1500, 100); if (!safeDelay(100)) return;
-                playTone(2000, 200);
+                //playTone(1000, 100); if (!safeDelay(100)) return;
+                //playTone(1500, 100); if (!safeDelay(100)) return;
+                //playTone(2000, 200);
 
                 for(int i=0; i<3; i++) {
                      drawBunny("/heal1.bmp");
@@ -188,10 +191,10 @@ void executeAction(int action) {
                 }
                 sick = false;  // uzdraveno
                 health = 100;  
-                lastIllCheck = millis(); // reset časovač nemoci
+                lastIllCheck = millis(); 
                 playSuccess();
             } else {
-                playCancel(); 
+                //playCancel(); 
             }
             break;
 
